@@ -1,0 +1,107 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import ElasticNet, Lasso, Ridge
+
+# Загрузка данных
+data = pd.read_csv("C:/000/housing.csv")
+Y = data['Y']
+X = data.drop('Y', axis=1)
+
+# Разделение данных на тренировочный и тестовый наборы
+x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=123)
+
+# Стандартизация данных
+scaler = StandardScaler()
+x_train = scaler.fit_transform(x_train)
+x_test = scaler.transform(x_test)
+
+# Функция для подбора оптимального значения параметра lambda
+def find_best_lambda(x_train, y_train, x_test, y_test, reg_type, rho=0.1):
+    lambdas = np.logspace(-5, 10, 15)
+    train_mse = []
+    test_mse = []
+    for l in lambdas:
+        if reg_type == "L1":
+            model = Lasso(alpha=l)
+        elif reg_type == "L2":
+            model = Ridge(alpha=l)
+        elif reg_type == "ElasticNet":
+            model = ElasticNet(alpha=l, l1_ratio=rho)
+        
+        model.fit(x_train, y_train)
+        train_predictions = model.predict(x_train)
+        test_predictions = model.predict(x_test)
+        train_mse.append(np.mean((y_train - train_predictions)**2))
+        test_mse.append(np.mean((y_test - test_predictions)**2))
+    
+    return lambdas, train_mse, test_mse
+
+# Подбор оптимального lambda для L1 регуляризации
+lambdas_l1, train_mse_l1, test_mse_l1 = find_best_lambda(x_train, y_train, x_test, y_test, "L1")
+
+# Подбор оптимального lambda для L2 регуляризации
+lambdas_l2, train_mse_l2, test_mse_l2 = find_best_lambda(x_train, y_train, x_test, y_test, "L2")
+
+# Подбор оптимального lambda для ElasticNet регуляризации
+lambdas_en, train_mse_en, test_mse_en = find_best_lambda(x_train, y_train, x_test, y_test, "ElasticNet")
+
+# Визуализация результатов подбора lambda
+plt.figure(figsize=(12, 6))
+plt.subplot(131)
+plt.plot(np.log10(lambdas_l1), train_mse_l1, label='Train MSE')
+plt.plot(np.log10(lambdas_l1), test_mse_l1, label='Test MSE')
+plt.xlabel('log10(lambda)')
+plt.ylabel('MSE')
+plt.title('L1 Regularization')
+plt.legend()
+
+plt.subplot(132)
+plt.plot(np.log10(lambdas_l2), train_mse_l2, label='Train MSE')
+plt.plot(np.log10(lambdas_l2), test_mse_l2, label='Test MSE')
+plt.xlabel('log10(lambda)')
+plt.ylabel('MSE')
+plt.title('L2 Regularization')
+plt.legend()
+
+plt.subplot(133)
+plt.plot(np.log10(lambdas_en), train_mse_en, label='Train MSE')
+plt.plot(np.log10(lambdas_en), test_mse_en, label='Test MSE')
+plt.xlabel('log10(lambda)')
+plt.ylabel('MSE')
+plt.title('ElasticNet Regularization')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+# Выбор оптимальных lambda
+best_lambda_l1 = lambdas_l1[np.argmin(test_mse_l1)]
+best_lambda_l2 = lambdas_l2[np.argmin(test_mse_l2)]
+best_lambda_en = lambdas_en[np.argmin(test_mse_en)]
+
+# Обучение моделей с оптимальными lambda
+model_l1 = Lasso(alpha=best_lambda_l1)
+model_l2 = Ridge(alpha=best_lambda_l2)
+model_en = ElasticNet(alpha=best_lambda_en, l1_ratio=0.1)
+
+model_l1.fit(x_train, y_train)
+model_l2.fit(x_train, y_train)
+model_en.fit(x_train, y_train)
+
+# Оценка MSE для тренировочных и тестовых данных
+train_mse_l1 = np.mean((y_train - model_l1.predict(x_train))**2)
+test_mse_l1 = np.mean((y_test - model_l1.predict(x_test))**2)
+
+train_mse_l2 = np.mean((y_train - model_l2.predict(x_train))**2)
+test_mse_l2 = np.mean((y_test - model_l2.predict(x_test))**2)
+
+train_mse_en = np.mean((y_train - model_en.predict(x_train))**2)
+test_mse_en = np.mean((y_test - model_en.predict(x_test))**2)
+
+# Вывод результатов
+print("L1 Regularization - Train MSE: {:.4f}, Test MSE: {:.4f}".format(train_mse_l1, test_mse_l1))
+print("L2 Regularization - Train MSE: {:.4f}, Test MSE: {:.4f}".format(train_mse_l2, test_mse_l2))
+print("ElasticNet Regularization - Train MSE: {:.4f}, Test MSE: {:.4f}".format(train_mse_en, test_mse_en))
